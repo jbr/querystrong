@@ -63,7 +63,11 @@ impl Value {
                 Value::Map(BTreeMap::new()).inner_append(current_index, index_path, value)
             }
 
-            (Value::Empty, current_index @ Some(Indexer::Number(_) | Indexer::Empty)) => {
+            (Value::Empty, current_index @ Some(Indexer::Number(_))) => {
+                Value::List(vec![]).inner_append(current_index, index_path, value)
+            }
+
+            (Value::Empty, current_index @ Some(Indexer::Empty)) => {
                 Value::List(vec![]).inner_append(current_index, index_path, value)
             }
 
