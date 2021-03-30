@@ -72,10 +72,7 @@ impl Value {
             }
 
             (v, indexer) => {
-                return Err(Error::Stuff(format!(
-                    "could not append with {:?} to {:?}",
-                    indexer, v
-                )))
+                return Err(format!("could not append with {:?} to {:?}", indexer, v).into())
             }
         }
     }

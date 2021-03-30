@@ -81,7 +81,7 @@ impl FromStr for IndexPath {
                 (BracketClose, Some('[')) => BracketOpen,
 
                 _ => {
-                    return Err(Error::Stuff(format!(
+                    return Err(Error::from(format!(
                         "parsing indexer ran into {:?} in state {:?} when parsing {:?}",
                         divider, state, orig
                     )))

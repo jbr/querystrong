@@ -1,7 +1,7 @@
-use thiserror::Error as ThisError;
-
-#[derive(Clone, ThisError, Debug)]
-pub enum Error {
-    #[error("{0}")]
-    Stuff(String),
+#[derive(Debug)]
+pub struct Error(String);
+impl From<String> for Error {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
 }
