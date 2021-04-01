@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Indexer",""],["Value",""]],"struct":[["Error",""],["IndexPath",""],["QueryStrong",""]],"type":[["Result",""]]});
