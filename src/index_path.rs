@@ -1,10 +1,10 @@
 use crate::{Error, Indexer};
-use fmt::Formatter;
-
-use std::collections::VecDeque;
-use std::fmt::{self, Display};
-use std::ops::{Deref, DerefMut};
-use std::str::FromStr;
+use std::{
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct IndexPath(VecDeque<Indexer>);
@@ -43,14 +43,13 @@ impl FromStr for IndexPath {
                 break;
             }
 
-            let (divider, current) =
-                if let Some(divider) = s.find(|c| c == ']' || c == '[' || c == '.') {
-                    let ret = (Some(s.chars().nth(divider).unwrap()), &s[..divider]);
-                    s = &s[divider + 1..];
-                    ret
-                } else {
-                    (None, s)
-                };
+            let (divider, current) = if let Some(divider) = s.find(|c| c == ']' || c == '[') {
+                let ret = (Some(s.chars().nth(divider).unwrap()), &s[..divider]);
+                s = &s[divider + 1..];
+                ret
+            } else {
+                (None, s)
+            };
 
             let mut push = || {
                 v.push_back(if current.is_empty() {

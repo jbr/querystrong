@@ -1,13 +1,10 @@
 use crate::{Error, IndexPath, Indexer};
 use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-use std::iter;
-use std::ops::Index;
+use std::{collections::BTreeMap, fmt::Debug, iter, ops::Index};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Value {
-    Map(BTreeMap<String, Box<Value>>),
+    Map(BTreeMap<String, Value>),
     List(Vec<Value>),
     String(String),
     Empty,
@@ -31,12 +28,45 @@ impl Default for Value {
 }
 
 impl Value {
-    pub fn map() -> Self {
+    pub fn new_map() -> Self {
         Self::Map(BTreeMap::new())
     }
 
-    pub fn list() -> Self {
+    pub fn new_list() -> Self {
         Self::List(Vec::new())
+    }
+
+    pub fn is_map(&self) -> bool {
+        matches!(self, &Self::Map(_))
+    }
+
+    pub fn is_string(&self) -> bool {
+        matches!(self, &Self::String(_))
+    }
+
+    pub fn is_list(&self) -> bool {
+        matches!(self, &Self::List(_))
+    }
+
+    pub fn as_slice(&self) -> Option<&[Self]> {
+        match self {
+            Self::List(ref l) => Some(&l[..]),
+            _ => None,
+        }
+    }
+
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+        match self {
+            Self::Map(ref m) => Some(&m),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::String(ref s) => Some(&**s),
+            _ => None,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -55,6 +85,47 @@ impl Value {
             Value::String(s) => s.len(),
             Value::Empty => 0,
         }
+    }
+
+    pub fn append(
+        &mut self,
+        key: impl Into<IndexPath>,
+        value: impl Into<Value>,
+    ) -> Result<(), Error> {
+        let mut index_path = key.into();
+        *self =
+            std::mem::take(self).inner_append(index_path.pop_front(), index_path, value.into())?;
+        Ok(())
+    }
+
+    pub fn get(&self, key: impl Into<IndexPath>) -> Option<&Value> {
+        let mut index_path = key.into();
+        let key = index_path.pop_front();
+        match (self, key) {
+            (Value::Map(m), Some(Indexer::String(key))) => {
+                m.get(&*key).and_then(|v| v.get(index_path))
+            }
+
+            (Value::List(l), Some(Indexer::Number(key))) => {
+                l.get(key).and_then(|v| v.get(index_path))
+            }
+
+            (this, None) => Some(this),
+
+            _ => None,
+        }
+    }
+
+    pub fn get_str(&self, key: impl Into<IndexPath>) -> Option<&str> {
+        self.get(key).and_then(Value::as_str)
+    }
+
+    pub fn get_slice(&self, key: impl Into<IndexPath>) -> Option<&[Value]> {
+        self.get(key).and_then(Value::as_slice)
+    }
+
+    pub fn get_map(&self, key: impl Into<IndexPath>) -> Option<&BTreeMap<String, Value>> {
+        self.get(key).and_then(Value::as_map)
     }
 
     fn inner_append(
@@ -114,12 +185,12 @@ impl Value {
                 for v in l {
                     match v {
                         Value::String(s) => {
-                            map.insert(s, Box::new(Value::Empty));
+                            map.insert(s, Value::Empty);
                         }
                         _ => return Err(format!("could not convert {:?} to a map", v).into()),
                     }
                 }
-                map.insert(s, Box::new(value));
+                map.insert(s, value);
                 Ok(Value::Map(map))
             }
 
@@ -136,35 +207,6 @@ impl Value {
                 )
                 .into());
             }
-        }
-    }
-
-    pub fn append(
-        &mut self,
-        key: impl Into<IndexPath>,
-        value: impl Into<Value>,
-    ) -> Result<(), Error> {
-        let mut index_path = key.into();
-        *self =
-            std::mem::take(self).inner_append(index_path.pop_front(), index_path, value.into())?;
-        Ok(())
-    }
-
-    pub fn get(&self, key: impl Into<IndexPath>) -> Option<&Value> {
-        let mut index_path = key.into();
-        let key = index_path.pop_front();
-        match (self, key) {
-            (Value::Map(m), Some(Indexer::String(key))) => {
-                m.get(&*key).and_then(|v| v.get(index_path))
-            }
-
-            (Value::List(l), Some(Indexer::Number(key))) => {
-                l.get(key).and_then(|v| v.get(index_path))
-            }
-
-            (this, None) => Some(this),
-
-            _ => None,
         }
     }
 }

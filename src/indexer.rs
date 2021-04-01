@@ -1,6 +1,5 @@
-use std::fmt::{self, Display, Formatter};
-
 use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Indexer {
@@ -40,7 +39,7 @@ impl From<()> for Indexer {
 }
 
 impl Display for Indexer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Indexer::Number(n) => f.write_str(&n.to_string()),
             Indexer::String(s) => {

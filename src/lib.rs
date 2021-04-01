@@ -6,9 +6,11 @@
     unused_qualifications
 )]
 
-use std::fmt::{self, Debug, Display, Formatter, Write};
-use std::ops::{Deref, DerefMut, Index};
-use std::str::FromStr;
+use std::{
+    fmt::{self, Debug, Display, Formatter, Write},
+    ops::{Deref, DerefMut, Index},
+    str::FromStr,
+};
 
 mod indexer;
 pub use indexer::Indexer;
@@ -24,19 +26,20 @@ pub use error::Error;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct QueryStrong(Value);
-impl Default for QueryStrong {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl QueryStrong {
     pub fn new() -> Self {
-        Self(Value::map())
+        Self(Value::new_map())
     }
 
     pub fn parse(s: &str) -> Result<Self, Error> {
         s.parse()
+    }
+}
+
+impl Default for QueryStrong {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -103,8 +106,8 @@ where
 {
     type Output = Value;
 
-    fn index(&self, k: K) -> &Self::Output {
-        self.get(k).unwrap()
+    fn index(&self, key: K) -> &Self::Output {
+        self.get(key).unwrap()
     }
 }
 
