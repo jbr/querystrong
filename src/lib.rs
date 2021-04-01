@@ -22,12 +22,17 @@ pub use value::Value;
 mod error;
 pub use error::Error;
 
-#[derive(Clone, Default)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct QueryStrong(Value);
+impl Default for QueryStrong {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl QueryStrong {
     pub fn new() -> Self {
-        Self::default()
+        Self(Value::map())
     }
 
     pub fn parse(s: &str) -> Result<Self, Error> {
@@ -72,18 +77,21 @@ impl DerefMut for QueryStrong {
 }
 
 impl<'a> IntoIterator for &'a QueryStrong {
-    type Item = (IndexPath, Option<&'a str>);
+    type Item = (IndexPath, Option<String>);
 
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         Box::new(self.0.into_iter().filter_map(|(k, v)| match (k, v) {
-            (Some(k), Some(v)) => Some((k, Some(v))),
+            (Some(k), Some(v)) => {
+                if k.is_empty() || k.get(0) == Some(&Indexer::Empty) {
+                    Some((IndexPath::from(v), None))
+                } else {
+                    Some((k, Some(v)))
+                }
+            }
             (Some(k), None) => Some((k, None)),
-            (None, Some(k)) => Some((
-                IndexPath::from(vec![Indexer::String(String::from(k))]),
-                None,
-            )),
+            (None, Some(k)) => Some((Indexer::from(k).into(), None)),
             (None, None) => None,
         }))
     }
@@ -115,7 +123,7 @@ impl Display for QueryStrong {
 
             if let Some(value) = value {
                 f.write_char('=')?;
-                f.write_str(value)?;
+                f.write_str(&value)?;
             }
         }
         Ok(())

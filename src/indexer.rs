@@ -1,5 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
+use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Indexer {
     Number(usize),
@@ -15,19 +17,19 @@ impl From<usize> for Indexer {
 
 impl From<String> for Indexer {
     fn from(f: String) -> Self {
-        Self::String(f)
+        Indexer::from(&f)
     }
 }
 
 impl From<&String> for Indexer {
     fn from(f: &String) -> Self {
-        Self::String(f.clone())
+        Indexer::from(&**f)
     }
 }
 
 impl From<&str> for Indexer {
     fn from(f: &str) -> Self {
-        Self::String(String::from(f))
+        Self::String(percent_decode_str(f).decode_utf8_lossy().into())
     }
 }
 
@@ -41,7 +43,9 @@ impl Display for Indexer {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Indexer::Number(n) => f.write_str(&n.to_string()),
-            Indexer::String(s) => f.write_str(s),
+            Indexer::String(s) => {
+                f.write_str(&utf8_percent_encode(s, NON_ALPHANUMERIC).to_string())
+            }
             Indexer::Empty => Ok(()),
         }
     }

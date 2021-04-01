@@ -58,7 +58,7 @@ impl FromStr for IndexPath {
                 } else if let Ok(u) = current.parse::<usize>() {
                     Indexer::Number(u)
                 } else {
-                    Indexer::String(String::from(current))
+                    Indexer::from(current)
                 });
             };
 
@@ -164,5 +164,11 @@ impl Display for IndexPath {
 impl From<()> for IndexPath {
     fn from(_: ()) -> Self {
         Self::from(vec![()])
+    }
+}
+
+impl From<Indexer> for IndexPath {
+    fn from(indexer: Indexer) -> Self {
+        Self::from(vec![indexer])
     }
 }

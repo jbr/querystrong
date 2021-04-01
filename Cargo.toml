@@ -10,3 +10,7 @@ documentation = "https://docs.rs/querystrong"
 license = "MIT OR Apache-2.0"
 keywords = ["queryparams", "querystring", "query-string", "query-params"]
 categories = ["web-programming::http-server", "web-programming"]
+
+[dependencies]
+percent-encoding = "2.1.0"
+

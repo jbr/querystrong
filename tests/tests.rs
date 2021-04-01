@@ -83,8 +83,6 @@ fn parse_list() {
 fn parse_list_with_no_values_and_duplicates() {
     let q = "a&b&a".parse::<QueryStrong>().unwrap();
     assert_eq!(q["a"], ());
-    assert_eq!(q["b"], ());
-
     assert_eq!(q.to_string(), "a&b");
 }
 
@@ -93,4 +91,27 @@ fn nested_list() {
     let q = QueryStrong::from(("a", vec!["1", "2"]));
     assert_eq!(q["a"], Value::from(vec!["1", "2"]));
     assert_eq!(q.to_string(), "a[]=1&a[]=2");
+}
+
+#[test]
+fn going_from_a_list_to_a_map() {
+    let q = QueryStrong::parse("a[]=x&a[]=y&a[z]=map").unwrap();
+    assert_eq!(
+        format!("{:?}", q),
+        r#"{"a": {"x": (), "y": (), "z": "map"}}"#
+    );
+    assert_eq!("a[x]&a[y]&a[z]=map", q.to_string());
+}
+
+#[test]
+fn encoding() {
+    let mut q = QueryStrong::new();
+    q.append(Indexer::from("a[b]"), "&b").unwrap();
+    assert_eq!("a%5Bb%5D=%26b", q.to_string());
+
+    let q = QueryStrong::parse("a%5B%5D=0%26b%3D2").unwrap();
+    assert_eq!(format!("{:?}", &q), r#"{"a[]": "0&b=2"}"#);
+    assert_eq!(q.get(Indexer::from("a[]")).unwrap(), "0&b=2");
+    assert_eq!(q.to_string(), "a%5B%5D=0%26b%3D2");
+    assert_eq!(q.get("a%5B%5D").unwrap(), "0&b=2");
 }

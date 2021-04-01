@@ -1,6 +1,8 @@
 use crate::{Error, IndexPath, Indexer};
+use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::iter;
 use std::ops::Index;
 
 #[derive(Clone, PartialEq, Eq)]
@@ -17,7 +19,7 @@ impl Debug for Value {
             Value::Map(m) => f.debug_map().entries(m).finish(),
             Value::List(l) => f.debug_list().entries(l).finish(),
             Value::String(s) => Debug::fmt(s, f),
-            Value::Empty => f.write_str("()"),
+            _ => f.write_str("()"),
         }
     }
 }
@@ -29,28 +31,71 @@ impl Default for Value {
 }
 
 impl Value {
+    pub fn map() -> Self {
+        Self::Map(BTreeMap::new())
+    }
+
+    pub fn list() -> Self {
+        Self::List(Vec::new())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Value::Map(m) => m.is_empty(),
+            Value::List(l) => l.is_empty() || l.iter().all(Value::is_empty),
+            Value::String(s) => s.is_empty(),
+            Value::Empty => true,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Value::Map(m) => m.len(),
+            Value::List(l) => l.len(),
+            Value::String(s) => s.len(),
+            Value::Empty => 0,
+        }
+    }
+
     fn inner_append(
         self,
         current_index: Option<Indexer>,
         index_path: IndexPath,
         value: Value,
     ) -> Result<Self, Error> {
-        match (self, current_index) {
-            (Value::Map(mut m), Some(Indexer::String(key))) => {
+        match (self, current_index, value) {
+            (Value::Map(mut m), Some(Indexer::String(key)), value) => {
                 m.entry(key).or_default().append(index_path, value)?;
                 Ok(Value::Map(m))
             }
 
-            (Value::Empty, None) => Ok(value),
+            (Value::Empty, None, value) => Ok(value),
+            (Value::Empty, Some(Indexer::Empty), value) => Ok(Value::List(vec![value])),
 
-            (Value::String(ref s), None) => Ok(Self::List(vec![s.into(), value])),
+            (Value::Empty, Some(Indexer::String(s)), Value::Empty) => Ok(Value::String(s)),
+            (Value::Empty, Some(Indexer::String(s)), value) => Value::Map(BTreeMap::new())
+                .inner_append(Some(Indexer::String(s)), index_path, value),
 
-            (Value::List(mut l), Some(Indexer::Empty)) => {
+            (Value::String(ref s), None, value)
+            | (Value::String(ref s), Some(Indexer::Empty), value) => {
+                Ok(Self::List(vec![s.into(), value]))
+            }
+
+            (Value::String(s1), Some(Indexer::String(s2)), Value::Empty) => {
+                Ok(Self::List(vec![Value::String(s1), Value::String(s2)]))
+            }
+
+            (Value::List(mut l), Some(Indexer::Empty), value) => {
                 l.push(value);
                 Ok(Value::List(l))
             }
 
-            (Value::List(mut l), Some(Indexer::Number(n))) => {
+            (Value::List(mut l), None, value) => {
+                l.push(value);
+                Ok(Value::List(l))
+            }
+
+            (Value::List(mut l), Some(Indexer::Number(n)), value) => {
                 while l.len() <= n {
                     l.push(Value::Empty);
                 }
@@ -59,20 +104,37 @@ impl Value {
                 Ok(Value::List(l))
             }
 
-            (Value::Empty, current_index @ Some(Indexer::String(_))) => {
-                Value::Map(BTreeMap::new()).inner_append(current_index, index_path, value)
+            (Value::List(mut l), Some(Indexer::String(s)), Value::Empty) => {
+                l.push(s.into());
+                Ok(Value::List(l))
             }
 
-            (Value::Empty, current_index @ Some(Indexer::Number(_))) => {
+            (Value::List(l), Some(Indexer::String(s)), value) => {
+                let mut map = BTreeMap::new();
+                for v in l {
+                    match v {
+                        Value::String(s) => {
+                            map.insert(s, Box::new(Value::Empty));
+                        }
+                        _ => return Err(format!("could not convert {:?} to a map", v).into()),
+                    }
+                }
+                map.insert(s, Box::new(value));
+                Ok(Value::Map(map))
+            }
+
+            (current_value, _, Value::Empty) => Ok(current_value),
+
+            (Value::Empty, current_index @ Some(Indexer::Number(_)), value) => {
                 Value::List(vec![]).inner_append(current_index, index_path, value)
             }
 
-            (Value::Empty, current_index @ Some(Indexer::Empty)) => {
-                Value::List(vec![]).inner_append(current_index, index_path, value)
-            }
-
-            (v, indexer) => {
-                return Err(format!("could not append with {:?} to {:?}", indexer, v).into())
+            (previous_value, indexer, new_value) => {
+                return Err(format!(
+                    "could not append ({:?}, {:?}, {:?})",
+                    previous_value, indexer, new_value
+                )
+                .into());
             }
         }
     }
@@ -109,19 +171,19 @@ impl Value {
 
 impl From<String> for Value {
     fn from(s: String) -> Value {
-        Value::String(s)
+        Self::from(&s)
     }
 }
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::String(String::from(s))
+        Value::String(percent_decode_str(s).decode_utf8_lossy().into())
     }
 }
 
 impl From<&String> for Value {
     fn from(s: &String) -> Self {
-        Value::String(String::from(s))
+        Self::from(&**s)
     }
 }
 
@@ -183,6 +245,15 @@ impl PartialEq<String> for Value {
     }
 }
 
+impl PartialEq<str> for Value {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            Value::String(ref s) => s == other,
+            _ => false,
+        }
+    }
+}
+
 impl PartialEq<&str> for Value {
     fn eq(&self, other: &&str) -> bool {
         match self {
@@ -193,7 +264,7 @@ impl PartialEq<&str> for Value {
 }
 
 impl<'a> IntoIterator for &'a Value {
-    type Item = (Option<IndexPath>, Option<&'a str>);
+    type Item = (Option<IndexPath>, Option<String>);
 
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
@@ -202,24 +273,29 @@ impl<'a> IntoIterator for &'a Value {
             Value::Map(m) => Box::new(m.iter().flat_map(|(k1, v)| {
                 v.into_iter().map(move |(k2, v)| match k2 {
                     Some(mut k2) => {
-                        k2.insert(0, k1.into());
+                        k2.push_front(Indexer::from(k1));
                         (Some(k2), v)
                     }
-                    None => (Some(k1.into()), v),
+                    None => (Some(Indexer::from(k1).into()), v),
                 })
             })),
 
             Value::List(l) => Box::new(l.iter().flat_map(|v| {
                 v.into_iter().map(move |(k, v)| match k {
                     Some(mut k) => {
-                        k.insert(0, ().into());
+                        k.push_front(().into());
                         (Some(k), v)
                     }
                     None => (Some(().into()), v),
                 })
             })),
-            Value::String(s) => Box::new(std::iter::once((None, Some(&**s)))),
-            Value::Empty => Box::new(std::iter::once((None, None))),
+
+            Value::String(s) => Box::new(iter::once((
+                None,
+                Some(utf8_percent_encode(s, NON_ALPHANUMERIC).to_string()),
+            ))),
+
+            Value::Empty => Box::new(iter::once((None, None))),
         }
     }
 }
