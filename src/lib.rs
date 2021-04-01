@@ -22,7 +22,7 @@ mod value;
 pub use value::Value;
 
 mod error;
-pub use error::Error;
+pub use error::{Error, Result};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct QueryStrong(Value);
@@ -32,7 +32,7 @@ impl QueryStrong {
         Self(Value::new_map())
     }
 
-    pub fn parse(s: &str) -> Result<Self, Error> {
+    pub fn parse(s: &str) -> Result<Self> {
         s.parse()
     }
 }
@@ -46,7 +46,7 @@ impl Default for QueryStrong {
 impl FromStr for QueryStrong {
     type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let mut q = QueryStrong::new();
         let parts = s.split('&').filter(|kv| !kv.is_empty()).map(|kv| {
             if let Some(eq) = kv.find('=') {

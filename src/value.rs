@@ -1,5 +1,6 @@
-use crate::{Error, IndexPath, Indexer};
+use crate::{IndexPath, Indexer, Result};
 use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
+use std::mem;
 use std::{collections::BTreeMap, fmt::Debug, iter, ops::Index};
 
 #[derive(Clone, PartialEq, Eq)]
@@ -87,14 +88,9 @@ impl Value {
         }
     }
 
-    pub fn append(
-        &mut self,
-        key: impl Into<IndexPath>,
-        value: impl Into<Value>,
-    ) -> Result<(), Error> {
+    pub fn append(&mut self, key: impl Into<IndexPath>, value: impl Into<Value>) -> Result<()> {
         let mut index_path = key.into();
-        *self =
-            std::mem::take(self).inner_append(index_path.pop_front(), index_path, value.into())?;
+        *self = mem::take(self).inner_append(index_path.pop_front(), index_path, value.into())?;
         Ok(())
     }
 
@@ -133,7 +129,7 @@ impl Value {
         current_index: Option<Indexer>,
         index_path: IndexPath,
         value: Value,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         match (self, current_index, value) {
             (Value::Map(mut m), Some(Indexer::String(key)), value) => {
                 m.entry(key).or_default().append(index_path, value)?;
@@ -260,12 +256,6 @@ impl<I: Into<Value>> From<Vec<I>> for Value {
     }
 }
 
-// impl From<QueryStrong> for Value {
-//     fn from(q: QueryStrong) -> Self {
-//         q.root
-//     }
-// }
-
 impl From<()> for Value {
     fn from(_: ()) -> Self {
         Self::Empty
@@ -342,13 +332,10 @@ impl<'a> IntoIterator for &'a Value {
     }
 }
 
-impl<K> Index<K> for Value
-where
-    K: Into<IndexPath>,
-{
+impl<Key: Into<IndexPath>> Index<Key> for Value {
     type Output = Self;
 
-    fn index(&self, k: K) -> &Self::Output {
-        self.get(k).unwrap()
+    fn index(&self, key: Key) -> &Self::Output {
+        self.get(key).unwrap()
     }
 }

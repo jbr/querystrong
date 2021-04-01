@@ -1,4 +1,4 @@
-use crate::{Error, Indexer};
+use crate::{Error, Indexer, Result};
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
@@ -33,7 +33,7 @@ pub enum IndexPathState {
 impl FromStr for IndexPath {
     type Err = Error;
 
-    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+    fn from_str(mut s: &str) -> Result<Self> {
         let orig = s;
         use IndexPathState::*;
         let mut v = VecDeque::new();

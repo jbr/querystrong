@@ -5,3 +5,5 @@ impl From<String> for Error {
         Self(s)
     }
 }
+
+pub type Result<T> = std::result::Result<T, Error>;
