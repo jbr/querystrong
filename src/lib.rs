@@ -184,3 +184,13 @@ pub(crate) fn encode(s: &str) -> String {
 
     percent_encoding::utf8_percent_encode(s, &ASCII_SET).to_string()
 }
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for QueryStrong {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}

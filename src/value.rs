@@ -340,3 +340,18 @@ impl<Key: Into<IndexPath>> Index<Key> for Value {
         self.get(key).unwrap()
     }
 }
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Value {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        match self {
+            Value::Map(m) => m.serialize(serializer),
+            Value::List(l) => l.serialize(serializer),
+            Value::String(s) => s.serialize(serializer),
+            Value::Empty => serializer.serialize_unit(),
+        }
+    }
+}

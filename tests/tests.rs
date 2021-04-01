@@ -158,3 +158,11 @@ fn encoding() {
     assert_eq!(q.to_string(), "a%5B%5D=0%26b%3D2");
     assert_eq!(q.get("a%5B%5D").unwrap(), "0&b=2");
 }
+
+#[cfg(feature = "serde")]
+#[test]
+fn serde() {
+    let q = QueryStrong::parse("a[b][]=1&b").unwrap();
+    let json = serde_json::to_value(&q).unwrap();
+    assert_eq!(json, serde_json::json!({"a": {"b": ["1"]}, "b": null}));
+}
