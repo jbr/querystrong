@@ -1,4 +1,3 @@
-use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
 use std::fmt::{Display, Formatter, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,7 +27,7 @@ impl From<&String> for Indexer {
 
 impl From<&str> for Indexer {
     fn from(f: &str) -> Self {
-        Self::String(percent_decode_str(f).decode_utf8_lossy().into())
+        Self::String(crate::decode(f))
     }
 }
 
@@ -42,9 +41,7 @@ impl Display for Indexer {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Indexer::Number(n) => f.write_str(&n.to_string()),
-            Indexer::String(s) => {
-                f.write_str(&utf8_percent_encode(s, NON_ALPHANUMERIC).to_string())
-            }
+            Indexer::String(s) => f.write_str(&crate::encode(s)),
             Indexer::Empty => Ok(()),
         }
     }

@@ -6,6 +6,30 @@
     unused_qualifications
 )]
 
+//! # QueryStrong: A flexible interface for querystrings
+//!
+//! Example:
+//!
+//! ```rust
+//! # fn main() -> querystrong::Result<()> {
+//! use querystrong::{QueryStrong, Value};
+//! let mut qs = QueryStrong::parse("user[name][first]=jacob&user[language]=rust")?;
+//! assert_eq!(qs["user[name][first]"], "jacob");
+//! assert_eq!(qs["user"].get_str("language"), Some("rust"));
+//! assert_eq!(qs.get_str("user[language]"), Some("rust"));
+//! assert!(qs["user"].is_map());
+//! assert!(qs["user[name]"].is_map());
+//!
+//! qs.append("user[name][last]", "rothstein")?;
+//! qs.append("user[language]", "english")?;
+//! assert_eq!(
+//!   qs.to_string(),
+//!   "user[language][]=rust&user[language][]=english&\
+//!   user[name][first]=jacob&user[name][last]=rothstein"
+//! );
+//! # Ok(())  }
+//! ```
+
 use std::{
     fmt::{self, Debug, Display, Formatter, Write},
     ops::{Deref, DerefMut, Index},
@@ -28,10 +52,13 @@ pub use error::{Error, Result};
 pub struct QueryStrong(Value);
 
 impl QueryStrong {
+    /// Creates a new (empty) querystrong that contains a map as the
+    /// top level value
     pub fn new() -> Self {
         Self(Value::new_map())
     }
 
+    /// Attempts to create a build a querystrong from the supplied querystring
     pub fn parse(s: &str) -> Result<Self> {
         s.parse()
     }
@@ -139,11 +166,21 @@ impl Debug for QueryStrong {
     }
 }
 
-impl<F> From<F> for QueryStrong
-where
-    Value: From<F>,
-{
-    fn from(f: F) -> Self {
-        Self(f.into())
+impl<V: Into<Value>> From<V> for QueryStrong {
+    fn from(value: V) -> Self {
+        Self(value.into())
     }
+}
+
+pub(crate) fn decode(s: &str) -> String {
+    percent_encoding::percent_decode_str(s)
+        .decode_utf8_lossy()
+        .into()
+}
+
+pub(crate) fn encode(s: &str) -> String {
+    static ASCII_SET: percent_encoding::AsciiSet =
+        percent_encoding::NON_ALPHANUMERIC.remove(b'_').remove(b'-');
+
+    percent_encoding::utf8_percent_encode(s, &ASCII_SET).to_string()
 }

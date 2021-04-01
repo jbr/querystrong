@@ -1,5 +1,4 @@
 use crate::{IndexPath, Indexer, Result};
-use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
 use std::mem;
 use std::{collections::BTreeMap, fmt::Debug, iter, ops::Index};
 
@@ -29,10 +28,12 @@ impl Default for Value {
 }
 
 impl Value {
+    /// Builds a querystrong::Value::Map
     pub fn new_map() -> Self {
         Self::Map(BTreeMap::new())
     }
 
+    /// Builds a querystrong::Value::List
     pub fn new_list() -> Self {
         Self::List(Vec::new())
     }
@@ -70,6 +71,9 @@ impl Value {
         }
     }
 
+    /// this is a general-purpose predicate that is broader than just
+    /// whether the value is an Empty. Zero-length Values of any sort
+    /// will return true from is_empty
     pub fn is_empty(&self) -> bool {
         match self {
             Value::Map(m) => m.is_empty(),
@@ -215,7 +219,7 @@ impl From<String> for Value {
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::String(percent_decode_str(s).decode_utf8_lossy().into())
+        Value::String(crate::decode(s))
     }
 }
 
@@ -322,10 +326,7 @@ impl<'a> IntoIterator for &'a Value {
                 })
             })),
 
-            Value::String(s) => Box::new(iter::once((
-                None,
-                Some(utf8_percent_encode(s, NON_ALPHANUMERIC).to_string()),
-            ))),
+            Value::String(s) => Box::new(iter::once((None, Some(crate::encode(s))))),
 
             Value::Empty => Box::new(iter::once((None, None))),
         }
