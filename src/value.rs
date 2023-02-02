@@ -1,4 +1,4 @@
-use crate::{IndexPath, Indexer, Result};
+use crate::{Error, IndexPath, Indexer, Result};
 use std::mem;
 use std::{collections::BTreeMap, fmt::Debug, iter, ops::Index};
 
@@ -59,7 +59,7 @@ impl Value {
 
     pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
         match self {
-            Self::Map(ref m) => Some(&m),
+            Self::Map(ref m) => Some(m),
             _ => None,
         }
     }
@@ -187,7 +187,7 @@ impl Value {
                         Value::String(s) => {
                             map.insert(s, Value::Empty);
                         }
-                        _ => return Err(format!("could not convert {:?} to a map", v).into()),
+                        _ => return Err(Error::CouldNotConvertToMap(v)),
                     }
                 }
                 map.insert(s, value);
@@ -201,11 +201,7 @@ impl Value {
             }
 
             (previous_value, indexer, new_value) => {
-                return Err(format!(
-                    "could not append ({:?}, {:?}, {:?})",
-                    previous_value, indexer, new_value
-                )
-                .into());
+                Err(Error::CouldNotAppend(previous_value, indexer, new_value))
             }
         }
     }
