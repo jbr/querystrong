@@ -54,7 +54,7 @@ fn deeply_nested() {
 
     assert_eq!(
         r#"{"one": {"two": {"three": ["1", "2", "3"]}}}"#,
-        format!("{:?}", q)
+        format!("{q:?}")
     );
 
     assert_eq!(
@@ -139,10 +139,7 @@ fn nested_list() {
 #[test]
 fn going_from_a_list_to_a_map() {
     let q = QueryStrong::parse("a[]=x&a[]=y&a[z]=map").unwrap();
-    assert_eq!(
-        format!("{:?}", q),
-        r#"{"a": {"x": (), "y": (), "z": "map"}}"#
-    );
+    assert_eq!(format!("{q:?}"), r#"{"a": {"x": (), "y": (), "z": "map"}}"#);
     assert_eq!("a[x]&a[y]&a[z]=map", q.to_string());
 }
 

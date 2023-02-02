@@ -80,10 +80,11 @@ impl FromStr for IndexPath {
                 (BracketClose, Some('[')) => BracketOpen,
 
                 _ => {
-                    return Err(Error::from(format!(
-                        "parsing indexer ran into {:?} in state {:?} when parsing {:?}",
-                        divider, state, orig
-                    )))
+                    return Err(Error::CouldNotParseIndexer(
+                        divider,
+                        state,
+                        orig.to_string(),
+                    ))
                 }
             };
         }
@@ -149,11 +150,11 @@ impl Display for IndexPath {
         let mut iter = self.0.iter();
 
         if let Some(first) = iter.next() {
-            f.write_fmt(format_args!("{}", first))?;
+            f.write_fmt(format_args!("{first}"))?;
         }
 
         for indexer in iter {
-            f.write_fmt(format_args!("[{}]", indexer))?;
+            f.write_fmt(format_args!("[{indexer}]"))?;
         }
 
         Ok(())
