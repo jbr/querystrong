@@ -173,7 +173,7 @@ impl<V: Into<Value>> From<V> for QueryStrong {
 }
 
 pub(crate) fn decode(s: &str) -> String {
-    percent_encoding::percent_decode_str(s)
+    percent_encoding::percent_decode_str(&s.replace('+', " "))
         .decode_utf8_lossy()
         .into()
 }

@@ -156,6 +156,12 @@ fn encoding() {
     assert_eq!(q.get("a%5B%5D").unwrap(), "0&b=2");
 }
 
+#[test]
+fn spaces_and_pluses() {
+    let q = QueryStrong::parse("key+with+spaces=value+with+spaces").unwrap();
+    assert_eq!(q["key with spaces"], "value with spaces");
+}
+
 #[cfg(feature = "serde")]
 #[test]
 fn serde() {
