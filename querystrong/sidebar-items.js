@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error",""],["Indexer",""],["Value",""]],"struct":[["IndexPath",""],["QueryStrong",""]],"type":[["Result",""]]};
