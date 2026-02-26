@@ -288,6 +288,103 @@ impl<'a> Value<'a> {
         self.get(key).and_then(Value::as_sparse_list)
     }
 
+    /// Remove and return the value at `key`, leaving [`Value::Empty`] in its place.
+    ///
+    /// Returns `None` if the path does not exist (same conditions as [`get`](Value::get)).
+    ///
+    /// Behaviour by container type:
+    /// - **`Map`**: the key is removed from the map after the value is taken.
+    /// - **`List`**: converted to a `SparseList` with the slot removed, then
+    ///   potentially promoted to SparseList — so taking the last element stays dense, and taking
+    ///   a middle element leaves a `SparseList` (symmetric with how insert promotes
+    ///   `List` → `SparseList` when a gap is created).
+    /// - **`SparseList`**: the entry is removed, then potentially promoted to a dense
+    ///   [`List`][Value::List] if the remaining content is contiguous.
+    pub fn take<'b>(&mut self, key: impl TryInto<IndexPath<'b>>) -> Option<Value<'a>> {
+        let mut index_path = key.try_into().ok()?;
+        let current = index_path.pop_front();
+        let (new_self, result) = mem::take(self).inner_take(current, index_path);
+        *self = new_self;
+        result
+    }
+
+    // Like inner_append, takes self by value and returns (new_self, result) so that
+    // the caller can put the (possibly modified) value back.  This avoids borrow-checker
+    // issues when we need to mem::take an entry and then either restore or remove it.
+    fn inner_take(
+        self,
+        current_index: Option<Indexer<'_>>,
+        mut remaining: IndexPath<'_>,
+    ) -> (Self, Option<Value<'a>>) {
+        match (self, current_index) {
+            // Base case: take the whole node, leave Empty behind.
+            (value, None) => (Value::Empty, Some(value)),
+
+            // Map: recurse into the child entry.
+            // Remove the key only if something was actually taken and the entry is now Empty.
+            // If the deeper path didn't exist, new_entry is the original value — restore it.
+            (Value::Map(mut m), Some(Indexer::String(key))) => {
+                if !m.contains_key(&*key) {
+                    return (Value::Map(m), None);
+                }
+                let next = remaining.pop_front();
+                let entry_val = mem::take(m.get_mut(&*key).unwrap());
+                let (new_entry, result) = entry_val.inner_take(next, remaining);
+                if result.is_some() && new_entry.is_empty() {
+                    m.remove(&*key);
+                } else {
+                    *m.get_mut(&*key).unwrap() = new_entry;
+                }
+                (Value::Map(m), result)
+            }
+
+            // Dense list: promote to BTreeMap, remove the entry, then try_densify.
+            // Taking the last element collapses back to a shorter List.
+            // Taking a middle element leaves a SparseList (gap created, symmetric with insert).
+            (Value::List(l), Some(Indexer::Number(n))) => {
+                let mut m: BTreeMap<usize, Value<'a>> = l.into_iter().enumerate().collect();
+                if !m.contains_key(&n) {
+                    return (try_densify(m), None);
+                }
+                let next = remaining.pop_front();
+                let entry_val = mem::take(m.get_mut(&n).unwrap());
+                let (new_entry, result) = entry_val.inner_take(next, remaining);
+                if result.is_some() && new_entry.is_empty() {
+                    m.remove(&n);
+                } else {
+                    *m.get_mut(&n).unwrap() = new_entry;
+                }
+                (try_densify(m), result)
+            }
+
+            // SparseList: remove the entry if taken, then try_densify.
+            (Value::SparseList(mut m), Some(Indexer::Number(n))) => {
+                let within_range = m.last_key_value().is_some_and(|(&max, _)| n <= max);
+                if !m.contains_key(&n) {
+                    return (
+                        Value::SparseList(m),
+                        if within_range {
+                            Some(Value::Empty)
+                        } else {
+                            None
+                        },
+                    );
+                }
+                let next = remaining.pop_front();
+                let entry_val = mem::take(m.get_mut(&n).unwrap());
+                let (new_entry, result) = entry_val.inner_take(next, remaining);
+                if result.is_some() && new_entry.is_empty() {
+                    m.remove(&n);
+                } else {
+                    *m.get_mut(&n).unwrap() = new_entry;
+                }
+                (try_densify(m), result)
+            }
+
+            (other, _) => (other, None),
+        }
+    }
+
     fn inner_append<'b: 'a>(
         self,
         current_index: Option<Indexer<'b>>,

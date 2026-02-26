@@ -541,6 +541,93 @@ fn large_numeric_index_overflow_treated_as_string_key() {
     assert!(qs["a"].is_map());
 }
 
+// ── take ─────────────────────────────────────────────────────────────────────
+
+#[test]
+fn take_map_key_returns_value_and_removes_key() {
+    let mut qs = QueryStrong::parse("a=1&b=2").unwrap();
+    assert_eq!(qs.take("a"), Some(Value::from("1")));
+    assert_eq!(qs.get("a"), None);
+    assert_eq!(qs.get_str("b"), Some("2"));
+}
+
+#[test]
+fn take_nested_map_key() {
+    let mut qs = QueryStrong::parse("a[b]=1&a[c]=2").unwrap();
+    assert_eq!(qs.take("a[b]"), Some(Value::from("1")));
+    assert_eq!(qs.get("a[b]"), None);
+    assert_eq!(qs.get_str("a[c]"), Some("2"));
+    // "a" still exists with remaining key
+    assert!(qs["a"].is_map());
+}
+
+#[test]
+fn take_last_map_key_removes_parent() {
+    let mut qs = QueryStrong::parse("a[b]=1").unwrap();
+    assert_eq!(qs.take("a[b]"), Some(Value::from("1")));
+    // "a" mapped to an empty map, so the key itself is removed
+    assert_eq!(qs.get("a"), None);
+}
+
+#[test]
+fn take_absent_key_returns_none() {
+    let mut qs = QueryStrong::parse("a=1").unwrap();
+    assert_eq!(qs.take("b"), None);
+    assert_eq!(qs.take("a[nested]"), None);
+    // Existing value unaffected
+    assert_eq!(qs.get_str("a"), Some("1"));
+}
+
+#[test]
+fn take_last_dense_list_element_stays_dense() {
+    let mut qs = QueryStrong::parse("a[]=x&a[]=y&a[]=z").unwrap();
+    assert_eq!(qs.take("a[2]"), Some(Value::from("z")));
+    assert!(qs["a"].is_dense_list());
+    assert_eq!(qs["a"].len(), 2);
+    assert_eq!(qs.to_string(), "a[]=x&a[]=y");
+}
+
+#[test]
+fn take_middle_dense_list_element_promotes_to_sparse() {
+    let mut qs = QueryStrong::parse("a[]=x&a[]=y&a[]=z").unwrap();
+    assert_eq!(qs.take("a[1]"), Some(Value::from("y")));
+    // Gap at 1 → SparseList; symmetrical with how insert creates a gap
+    assert!(qs["a"].is_sparse_list());
+    assert_eq!(qs.get_str("a[0]"), Some("x"));
+    assert_eq!(qs["a"][1], Value::Empty); // in-range absent slot
+    assert_eq!(qs.get_str("a[2]"), Some("z"));
+    assert_eq!(qs.to_string(), "a[0]=x&a[2]=z");
+}
+
+#[test]
+fn take_sparse_list_entry_removes_it() {
+    let mut qs = QueryStrong::parse("a[0]=x&a[5]=z").unwrap();
+    assert_eq!(qs.take("a[5]"), Some(Value::from("z")));
+    assert_eq!(qs.get("a[5]"), None);
+    assert_eq!(qs.get_str("a[0]"), Some("x"));
+}
+
+#[test]
+fn take_sparse_fills_gap_and_densifies() {
+    // After taking [5], only [0] remains → try_densify collapses to List
+    let mut qs = QueryStrong::parse("a[0]=x&a[5]=z").unwrap();
+    qs.take("a[5]");
+    assert!(qs["a"].is_dense_list());
+    assert_eq!(qs.to_string(), "a[]=x");
+}
+
+#[test]
+fn take_whole_subtree() {
+    let mut qs = QueryStrong::parse("a[b][c]=1&a[b][d]=2&e=3").unwrap();
+    let subtree = qs.take("a[b]").unwrap();
+    assert!(subtree.is_map());
+    assert_eq!(subtree.get_str("c"), Some("1"));
+    assert_eq!(subtree.get_str("d"), Some("2"));
+    // "a" → empty map → removed; "e" unaffected
+    assert_eq!(qs.get("a"), None);
+    assert_eq!(qs.get_str("e"), Some("3"));
+}
+
 // ── SparseList behaviour ─────────────────────────────────────────────────────
 
 #[test]
