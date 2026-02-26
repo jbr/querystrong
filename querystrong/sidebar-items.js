@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Error","Indexer","Value"],"struct":["IndexPath","ParseErrors","QueryStrong"],"type":["ParseResult","Result"]};
