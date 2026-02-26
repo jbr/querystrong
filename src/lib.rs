@@ -8,17 +8,27 @@
 
 //! # QueryStrong: A flexible interface for querystrings
 //!
-//! QueryStrong parses query strings (e.g. `user[name][first]=jacob&user[age]=30`)
+//! QueryStrong parses query strings (e.g. `user[name][first]=jacob&user[age]=100`)
 //! into a nested [`Value`] tree that can be traversed, mutated, and serialized back
 //! to a string.
 //!
-//! ## Zero-copy parsing
+//! ```rust
+//! use querystrong::QueryStrong;
 //!
-//! Parsing borrows directly from the input `&str` wherever possible.  String
-//! regions that do not require percent-decoding or `+`-as-space substitution
-//! are never copied.  The lifetime `'a` on [`QueryStrong<'a>`] and [`Value<'a>`]
-//! tracks this borrow.  Call [`QueryStrong::into_owned`] to obtain a `'static`
-//! value that owns all its strings.
+//! let mut qs = QueryStrong::parse("user[name][first]=jacob&user[language]=rust");
+//! assert_eq!(qs["user[name][first]"], "jacob");
+//! assert_eq!(qs.get_str("user[language]"), Some("rust"));
+//! assert!(qs["user"].is_map());
+//! assert!(qs["user[name]"].is_map());
+//!
+//! qs.append("user[name][last]", "rothstein").unwrap();
+//! qs.append("user[language]", "english").unwrap();
+//! assert_eq!(
+//!   qs.to_string(),
+//!   "user[language][]=rust&user[language][]=english&\
+//!   user[name][first]=jacob&user[name][last]=rothstein"
+//! );
+//! ```
 //!
 //! ## Permissive parsing
 //!
@@ -30,36 +40,21 @@
 //! Use [`QueryStrong::parse_strict`] if you need a hard failure on any error,
 //! or call [`QueryStrong::into_result`] / [`QueryStrong::unwrap`] after the fact.
 //!
-//! ## Sparse lists
+//! ## Zero-copy parsing
 //!
-//! Explicit numeric indices like `a[999999]=v` create a [`Value::SparseList`]
-//! backed by a `BTreeMap`, so only one entry is allocated regardless of the
-//! index value.  Empty-bracket appends (`a[]=v`) create a dense [`Value::List`].
+//! Parsing borrows directly from the input `&str` wherever possible.  String
+//! regions that do not require percent-decoding or `+`-as-space substitution
+//! are never copied.  The lifetime `'a` on [`QueryStrong<'a>`] and [`Value<'a>`]
+//! tracks this borrow.  Call [`QueryStrong::into_owned`] to obtain a `'static`
+//! value that owns all its strings.
 //!
-//! ## Example
+//! ## List variants
 //!
-//! ```rust
-//! use querystrong::QueryStrong;
-//!
-//! let mut qs = QueryStrong::parse("user[name][first]=jacob&user[language]=rust");
-//! assert_eq!(qs["user[name][first]"], "jacob");
-//! assert_eq!(qs.get_str("user[language]"), Some("rust"));
-//! assert!(qs["user"].is_map());
-//! assert!(qs["user[name]"].is_map());
-//! assert!(qs.errors().is_none());
-//!
-//! qs.append("user[name][last]", "rothstein").unwrap();
-//! qs.append("user[language]", "english").unwrap();
-//! assert_eq!(
-//!   qs.to_string(),
-//!   "user[language][]=rust&user[language][]=english&\
-//!   user[name][first]=jacob&user[name][last]=rothstein"
-//! );
-//!
-//! // Sparse lists: a[999999]=v allocates one entry, not 1 000 000 slots
-//! let qs = QueryStrong::parse("a[999999]=v");
-//! assert_eq!(qs["a"].as_sparse_list().unwrap().len(), 1);
-//! ```
+//! Empty-bracket appends (`a[]=v`) produce a dense [`Value::List`].  Explicit
+//! numeric indices (`a[3]=v`) produce a [`Value::SparseList`] backed by a
+//! `BTreeMap`, which is memory-safe for large indices like `a[999999]=v`.  A
+//! sparse list collapses back to a dense list automatically once its indices
+//! become contiguous from zero.
 
 use std::{
     convert::{Infallible, TryFrom, TryInto},

@@ -1,6 +1,26 @@
 # querystrong
 
-To get started, see [the api docs][docs]
+QueryStrong parses query strings like `user[name][first]=jacob&user[language]=rust`
+into a nested value tree that can be traversed, mutated, and serialized back to a string.
+
+```rust
+use querystrong::QueryStrong;
+
+let mut qs = QueryStrong::parse("user[name][first]=jacob&user[language]=rust");
+assert_eq!(qs["user[name][first]"], "jacob");
+assert_eq!(qs.get_str("user[language]"), Some("rust"));
+assert!(qs["user"].is_map());
+
+qs.append("user[name][last]", "rothstein").unwrap();
+qs.append("user[language]", "english").unwrap();
+assert_eq!(
+    qs.to_string(),
+    "user[language][]=rust&user[language][]=english&\
+     user[name][first]=jacob&user[name][last]=rothstein"
+);
+```
+
+For full documentation, see [the api docs][docs]
 
 * [API Docs][docs] [![docs.rs docs][docs-badge]][docs]
 * [Releases][releases] [![crates.io version][version-badge]][crate]
